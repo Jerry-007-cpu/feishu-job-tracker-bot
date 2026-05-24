@@ -252,16 +252,6 @@ async function main(): Promise<void> {
       '模板副本链接 / BASE_TOKEN',
       values.BASE_TOKEN,
     );
-    values.FEISHU_VERIFICATION_TOKEN = await question(
-      rl,
-      'FEISHU_VERIFICATION_TOKEN（可先留空）',
-      values.FEISHU_VERIFICATION_TOKEN,
-    );
-    values.FEISHU_ENCRYPT_KEY = await question(
-      rl,
-      'FEISHU_ENCRYPT_KEY（可先留空）',
-      values.FEISHU_ENCRYPT_KEY,
-    );
     values.PORT = await question(rl, 'PORT', values.PORT);
 
     console.log('\n正在检查飞书应用凭证和多维表格权限...');
@@ -292,7 +282,7 @@ async function main(): Promise<void> {
     }
     console.log('\n下一步：');
     console.log('1. npm run dev');
-    console.log('2. 如果要在飞书里私聊机器人，把 /webhook/lark 配成公网 HTTPS 回调。');
+    console.log('2. 确认飞书后台事件订阅选择了"使用长连接接收事件"，并添加 im.message.receive_v1。');
   } catch (err) {
     console.error(`\nsetup 失败：${(err as Error).message}`);
     console.error('请确认：App ID/Secret 正确；应用已开 bitable:app 权限；如果填 wiki 链接，还要开 wiki:node:read；并且模板副本里已经添加了这个文档应用。');

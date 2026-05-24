@@ -1,6 +1,6 @@
 ---
 name: feishu-job-tracker-bot
-description: Use when setting up or troubleshooting the Feishu job tracker bot repository. Helps install dependencies, run npm setup, resolve Feishu wiki/base template links, generate .env, explain when public HTTPS is required, and guide webhook/bot publishing steps.
+description: Use when setting up or troubleshooting the Feishu job tracker bot repository. Helps install dependencies, run npm setup, resolve Feishu wiki/base template links, generate .env, configure long connection event subscription, and debug bot replies.
 ---
 
 # Feishu Job Tracker Bot
@@ -9,10 +9,7 @@ Use this skill when the user wants to install, configure, simplify, or debug `Je
 
 ## Goal
 
-Get the user from a copied Feishu template to a working `.env` with the fewest manual steps. Keep the user-facing explanation short. Separate:
-
-- Template-only use: no public HTTPS needed.
-- Feishu private-chat bot use: public HTTPS webhook is required.
+Get the user from a copied Feishu template to a working long-connection bot with the fewest manual steps. Keep the user-facing explanation short. Do not ask users to configure public HTTPS, webhook URLs, ngrok, or domains.
 
 ## Human Setup Path
 
@@ -23,6 +20,7 @@ git clone https://github.com/Jerry-007-cpu/feishu-job-tracker-bot.git
 cd feishu-job-tracker-bot
 npm install
 npm run setup
+npm run dev
 ```
 
 `npm run setup` prompts for:
@@ -30,8 +28,6 @@ npm run setup
 - `FEISHU_APP_ID`
 - `FEISHU_APP_SECRET`
 - the copied template URL or real Base token
-- optional webhook `Verification Token`
-- optional `Encrypt Key`
 
 The setup script writes `.env`, resolves wiki links to real Base tokens, and auto-picks the main table.
 
@@ -48,7 +44,9 @@ When acting as an AI Agent:
    - The app lacks `bitable:app`.
    - The template link is a wiki link and the app lacks `wiki:node:read`.
    - The copied template has not added the app as a document app.
-6. Run `npm test` and `npm run type-check` after code changes.
+6. Confirm the Feishu developer console uses "使用长连接接收事件" and subscribes to `im.message.receive_v1`.
+7. Run `npm run dev`; tell the user to keep the process running while using the bot.
+8. Run `npm test` and `npm run type-check` after code changes.
 
 ## Required Feishu Setup
 
@@ -59,18 +57,18 @@ The user needs a Feishu self-built app with:
 - `bitable:app`
 - `wiki:node:read` if the template link is `/wiki/...`
 - Bot capability enabled
+- Event subscription mode set to "使用长连接接收事件"
+- Event `im.message.receive_v1` added
 - The app added to the copied template via "添加文档应用"
 
-## Public HTTPS Rule
+## Long Connection Rule
 
 Be precise:
 
-- Installing/copying the template: no public HTTPS.
-- Generating `.env` and resolving table IDs: no public HTTPS.
-- Running local tests: no public HTTPS.
-- Receiving messages from Feishu private chat: public HTTPS is required because Feishu must POST events to `/webhook/lark`.
-
-For local bot testing, suggest ngrok or localtunnel. For production, suggest Vercel, Railway, or Cloudflare.
+- No public domain, public IP, webhook URL, ngrok, or localtunnel is required.
+- The user's machine must be able to access the public internet.
+- The bot only receives messages while `npm run dev` is running.
+- If multiple long-connection clients run for the same app, Feishu may deliver an event to only one random client.
 
 ## README Style
 
@@ -78,5 +76,5 @@ Keep README short:
 
 - Human quick start first.
 - AI Agent quick start second.
-- Webhook/public HTTPS as an optional bot-enabling step.
+- Long connection as the only recommended receive mode.
 - Troubleshooting as three bullets: cannot find bot, bot does not reply, bot cannot write table.
