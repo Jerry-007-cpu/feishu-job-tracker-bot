@@ -6,6 +6,12 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org/)
 
+<p align="center">
+  <a href="https://y00b74dmx5n.feishu.cn/wiki/R4llwv5GUi8WVxkNIEYcyZGOnpe?table=blkU6cb41JepghrF">
+    <img alt="一键安装飞书模板" src="https://img.shields.io/badge/%E9%A3%9E%E4%B9%A6%E6%A8%A1%E6%9D%BF-%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85-00B96B?style=for-the-badge">
+  </a>
+</p>
+
 ## ✨ 特性
 
 - 🤖 **指令式交互**：`/创建` `/更新` `/查询` `/帮助` 四个命令搞定所有操作
@@ -34,29 +40,26 @@
 ### 前置条件
 
 - Node.js ≥ 20（[下载](https://nodejs.org/)）
-- 一个**已配好多维表格**的飞书账号（个人或企业自建均可）
+- 一个飞书账号（个人或企业自建均可）
 - 一个能跑公网 HTTPS 的地方（本地调试用 [ngrok](https://ngrok.com/)；生产用 Vercel / Cloudflare Workers）
 
-### 1. 准备你的多维表格
+### 1. 安装飞书模板
 
-在飞书多维表格里建一张"求职投递"表，**字段名必须和下面一致**（中文严格匹配）：
+点击上方 **一键安装飞书模板**，把"求职投递"模板复制到你自己的飞书空间。模板已经配好主表字段、单选枚举和基础视图，不需要手动建字段。
 
-| 字段名 | 类型 | 必填 | 备注 |
-|--------|------|------|------|
-| 公司 | 单行文本 | ✅ | |
-| 岗位名称 | 单行文本 | ✅ | |
-| 当前进度 | 单选 | 推荐 | 选项：投递/测评/初筛/群面/一面/二面/三面/hr面/offer |
-| 对应日期 | 日期 | | YYYY-MM-DD |
-| 平台 | 单选 | | 选项：官网/牛客/Boss/内推/公众号/邮件/其他 |
-| base | 单选 | | 选项：北京/上海/杭州/深圳/南京/广州/成都/迪拜/天津 |
-| 备注 | 单行文本 | | |
-| jd | 多行文本 | | |
+安装完成后，打开你自己的模板副本，从浏览器地址栏提取两个 ID：
 
-> 字段名或枚举要改？修改 `src/types.ts` 里的 `FIELD_NAME_MAP` 和相关常量即可。
+- `BASE_TOKEN`：URL 里 `/base/` 后面的这一段
+- `MAIN_TABLE_ID`：URL 里 `table=` 后面的这一段
 
-从表格 URL 里提取两个 ID：
-- 形如 `https://xxx.feishu.cn/base/<APP_TOKEN>?table=<TABLE_ID>` → 取出 `APP_TOKEN` 和 `TABLE_ID`
-- 如果是 wiki 嵌入的（`/wiki/<WIKI_TOKEN>?table=<TABLE_ID>`），需要先把 wiki node 解析成 app_token，可用 lark-cli 或调一次 `wiki/v2/spaces/get_node` 接口
+示例：
+
+```text
+https://xxx.feishu.cn/base/bascnxxxxxxxxxxxx?table=tblxxxxxxxxxxxx
+                         ^ BASE_TOKEN       ^ MAIN_TABLE_ID
+```
+
+如果你看到的是 `https://xxx.feishu.cn/wiki/<WIKI_TOKEN>?table=<TABLE_ID>` 这种 wiki 链接，不要把 `WIKI_TOKEN` 填进 `BASE_TOKEN`。请在页面里打开多维表格本体，复制 `/base/<BASE_TOKEN>?table=<MAIN_TABLE_ID>` 形式的链接；或者用 lark-cli / `wiki/v2/spaces/get_node` 把 wiki node 解析成真正的 `app_token`。
 
 ### 2. 在飞书开放平台创建机器人
 
@@ -69,15 +72,26 @@
 4. 进 "**应用功能** → 机器人**"，启用机器人能力
 5. （稍后再做）进 "**事件与回调** → 事件配置"，等下面服务起好了再回来配 webhook URL
 
-### 3. 克隆 + 安装
+### 3. 把机器人授权给模板副本（方案 A）
+
+模板安装后，你拿到的是自己的多维表格副本；你的机器人应用默认没有这个副本的读写权限，需要手动添加一次文档应用：
+
+1. 打开第 1 步安装出来的模板副本
+2. 点击右上角 "**...**" → "**更多**" → "**添加文档应用**"
+3. 搜索你在第 2 步创建的机器人应用名称
+4. 添加应用，并确认它可以访问当前多维表格
+
+完成后，机器人才能用 `.env` 里的 `BASE_TOKEN` 和 `MAIN_TABLE_ID` 写入这份表。
+
+### 4. 克隆 + 安装
 
 ```bash
-git clone https://github.com/<你的用户名>/lark-application-bot.git
-cd lark-application-bot
+git clone https://github.com/Jerry-007-cpu/feishu-job-tracker-bot.git
+cd feishu-job-tracker-bot
 npm install
 ```
 
-### 4. 配置环境变量
+### 5. 配置环境变量
 
 ```bash
 cp .env.example .env
@@ -98,7 +112,7 @@ PORT=3000
 
 > ⚠️ `.env` 已在 `.gitignore` 里，**绝对不要提交到仓库**。
 
-### 5. 跑通本地测试
+### 6. 跑通本地测试
 
 ```bash
 npm test           # 应看到 16/16 通过
@@ -107,7 +121,7 @@ npm run dev        # 启动开发服务，监听 3000 端口
 
 看到 `🚀 Lark Bot server running on http://localhost:3000` 就成功了。
 
-### 6. 让飞书能找到你的服务
+### 7. 让飞书能找到你的服务
 
 **本地调试**（推荐刚开始用）：
 
@@ -129,7 +143,7 @@ ngrok http 3000
 
 > 一键部署按钮需要你 fork 本仓库后，在按钮链接里把 git URL 改成你的仓库地址才能生效。
 
-### 7. 回飞书后台配 webhook
+### 8. 回飞书后台配 webhook
 
 1. 飞书后台 → "**事件与回调** → 事件配置**"
 2. **请求地址**填 `https://你的域名/webhook/lark`
@@ -139,7 +153,7 @@ ngrok http 3000
 6. 飞书会自动发一个 URL 验证，看到 ✅ 就成功了
 7. 重启服务（`Ctrl+C` 后 `npm run dev`）让新环境变量生效
 
-### 8. 发布应用 + 加机器人为好友
+### 9. 发布应用 + 加机器人为好友
 
 1. 飞书后台 → "**版本管理与发布**" → 创建版本 → 可见范围选"仅自己"（或你的团队） → 提交申请
 2. 个人企业一般自己当管理员，立刻审批通过
@@ -178,7 +192,7 @@ tests/
 2. **`src/bot/parser.ts`** 的 `buildBitableFields` — 加新字段的映射
 3. **`src/bot/commands.ts`** 的 `handleHelp` — 改 /帮助 的文案
 4. **`src/bot/parser.ts`** 的 `detectCommand` 正则 — 如果你想换命令名（比如 `/add` 替代 `/创建`）
-5. **`README.md`** —— 改字段表
+5. **`README.md`** —— 改模板和安装说明
 
 `src/lark/*`（飞书 API 封装）和 `src/utils/dedupe.ts` 大概率不用改。
 
