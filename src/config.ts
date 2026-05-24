@@ -8,6 +8,10 @@ function requireEnv(key: string): string {
   return value;
 }
 
+function optionalEnv(key: string): string {
+  return process.env[key]?.trim() || '';
+}
+
 export const config = {
   feishu: {
     appId: requireEnv('FEISHU_APP_ID'),
@@ -17,8 +21,8 @@ export const config = {
   },
   base: {
     token: requireEnv('BASE_TOKEN'),
-    mainTableId: requireEnv('MAIN_TABLE_ID'),
-    progressTableId: process.env.PROGRESS_TABLE_ID || '',
+    mainTableId: optionalEnv('MAIN_TABLE_ID'),
+    progressTableId: optionalEnv('PROGRESS_TABLE_ID'),
   },
   port: parseInt(process.env.PORT || '3000', 10),
 };

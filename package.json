@@ -19,6 +19,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "setup": "tsx src/setup.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",

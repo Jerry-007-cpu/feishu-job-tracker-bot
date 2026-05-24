@@ -35,84 +35,43 @@
 
 参数顺序无关、可缺省，紧贴写法（`当前进度三面`）和带空格写法（`当前进度 三面`）都识别。
 
-## 🚀 5 分钟跑通指南
+## 🚀 快速开始
+
+> AI Agent 正在帮你安装？可以直接跳到 [AI Agent 快速开始](#ai-agent-快速开始)。
 
 ### 前置条件
 
 - Node.js ≥ 20（[下载](https://nodejs.org/)）
 - 一个飞书账号（个人或企业自建均可）
-- 一个能跑公网 HTTPS 的地方（本地调试用 [ngrok](https://ngrok.com/)；生产用 Vercel / Cloudflare Workers）
+- 一个飞书自建应用的 `App ID` / `App Secret`
 
-### 1. 安装飞书模板
+> 公网 HTTPS 只在启用"飞书私聊机器人"时需要；安装模板和生成 `.env` 不需要公网。
 
-点击上方 **一键安装飞书模板**，把"求职投递"模板复制到你自己的飞书空间。模板已经配好主表字段、单选枚举和基础视图，不需要手动建字段。
+### 1. 安装模板
 
-安装完成后，打开你自己的模板副本，从浏览器地址栏提取两个 ID：
+点击上方 **一键安装飞书模板**，复制到你自己的飞书空间。模板已配好字段和视图。
 
-- `BASE_TOKEN`：URL 里 `/base/` 后面的这一段
-- `MAIN_TABLE_ID`：URL 里 `table=` 后面的这一段
+### 2. 准备飞书应用
 
-示例：
+在 [飞书开放平台](https://open.feishu.cn/app) 创建企业自建应用，然后：
 
-```text
-https://xxx.feishu.cn/base/bascnxxxxxxxxxxxx?table=tblxxxxxxxxxxxx
-                         ^ BASE_TOKEN       ^ MAIN_TABLE_ID
-```
+1. 在"凭证与基础信息"复制 `App ID` 和 `App Secret`
+2. 在"权限管理"开通 `im:message`、`im:message:send_as_bot`、`bitable:app`、`wiki:node:read`
+3. 在"应用功能 → 机器人"启用机器人
+4. 在模板副本里点右上角 "**...**" → "**更多**" → "**添加文档应用**"，添加这个机器人应用
 
-如果你看到的是 `https://xxx.feishu.cn/wiki/<WIKI_TOKEN>?table=<TABLE_ID>` 这种 wiki 链接，不要把 `WIKI_TOKEN` 填进 `BASE_TOKEN`。请在页面里打开多维表格本体，复制 `/base/<BASE_TOKEN>?table=<MAIN_TABLE_ID>` 形式的链接；或者用 lark-cli / `wiki/v2/spaces/get_node` 把 wiki node 解析成真正的 `app_token`。
-
-### 2. 在飞书开放平台创建机器人
-
-1. 打开 [飞书开放平台](https://open.feishu.cn/app) → 创建企业自建应用
-2. 进 "**凭证与基础信息**"，记下 `App ID` 和 `App Secret`
-3. 进 "**权限管理**" → 批量开通：
-   - `im:message`（收发消息）
-   - `im:message:send_as_bot`（机器人身份发消息）
-   - `bitable:app`（读写多维表格）
-4. 进 "**应用功能** → 机器人**"，启用机器人能力
-5. （稍后再做）进 "**事件与回调** → 事件配置"，等下面服务起好了再回来配 webhook URL
-
-### 3. 把机器人授权给模板副本（方案 A）
-
-模板安装后，你拿到的是自己的多维表格副本；你的机器人应用默认没有这个副本的读写权限，需要手动添加一次文档应用：
-
-1. 打开第 1 步安装出来的模板副本
-2. 点击右上角 "**...**" → "**更多**" → "**添加文档应用**"
-3. 搜索你在第 2 步创建的机器人应用名称
-4. 添加应用，并确认它可以访问当前多维表格
-
-完成后，机器人才能用 `.env` 里的 `BASE_TOKEN` 和 `MAIN_TABLE_ID` 写入这份表。
-
-### 4. 克隆 + 安装
+### 3. 克隆并自动配置
 
 ```bash
 git clone https://github.com/Jerry-007-cpu/feishu-job-tracker-bot.git
 cd feishu-job-tracker-bot
 npm install
+npm run setup
 ```
 
-### 5. 配置环境变量
+`npm run setup` 会按提示生成 `.env`：可以直接粘贴你的模板副本链接，即使是 `https://xxx.feishu.cn/wiki/xxx?table=xxx` 这种老文档/wiki 链接也可以。脚本会自动解析真实 `BASE_TOKEN`，并自动找到主表 `MAIN_TABLE_ID`。
 
-```bash
-cp .env.example .env
-```
-
-编辑 `.env`，填入你刚才拿到的值：
-
-```env
-FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
-FEISHU_APP_SECRET=你的_App_Secret
-FEISHU_VERIFICATION_TOKEN=             # 配完 webhook 再回填
-FEISHU_ENCRYPT_KEY=                    # 强烈建议在飞书后台启用并填
-BASE_TOKEN=你的_多维表格_app_token
-MAIN_TABLE_ID=你的_主表_table_id
-PROGRESS_TABLE_ID=                     # 可选，如果有附表
-PORT=3000
-```
-
-> ⚠️ `.env` 已在 `.gitignore` 里，**绝对不要提交到仓库**。
-
-### 6. 跑通本地测试
+### 4. 本地启动
 
 ```bash
 npm test           # 应看到 16/16 通过
@@ -121,51 +80,48 @@ npm run dev        # 启动开发服务，监听 3000 端口
 
 看到 `🚀 Lark Bot server running on http://localhost:3000` 就成功了。
 
-### 7. 让飞书能找到你的服务
+### 5. 启用飞书私聊机器人
 
-**本地调试**（推荐刚开始用）：
+如果只是复制模板，不需要这一步。  
+如果要在飞书里私聊机器人发 `/创建` `/查询`，飞书必须能访问你的服务，所以这里需要公网 HTTPS。
+
+1. 本地调试：用 ngrok 暴露 `http://localhost:3000`，得到 `https://...ngrok-free.app`
+2. 生产使用：部署到 Vercel / Railway / Cloudflare Workers 等平台
+3. 飞书后台 → "事件与回调" → 请求地址填 `https://你的域名/webhook/lark`
+4. 添加事件 `im.message.receive_v1`
+5. 复制 `Verification Token` 和可选的 `Encrypt Key`，重新运行 `npm run setup` 或手动填进 `.env`
+6. "版本管理与发布"发布应用，在飞书里搜索机器人并私聊 `/帮助`
+
+看到机器人回复，就是全通了。
+
+### AI Agent 快速开始
+
+如果你在用 Codex / Claude Code / Cursor 这类 AI Agent，可以先安装本仓库配套 skill：
 
 ```bash
-brew install ngrok                      # macOS
-ngrok config add-authtoken <YOUR_TOKEN> # 注册 ngrok 后拿到
-ngrok http 3000
+npx skills add Jerry-007-cpu/feishu-job-tracker-bot@feishu-job-tracker-bot -g -y
 ```
 
-会得到形如 `https://abc-def.ngrok-free.app` 的公网地址。
+然后直接对 Agent 说：
 
-**生产部署**：
+```text
+帮我配置 feishu-job-tracker-bot。我已经复制了飞书模板，下面是模板链接和飞书应用 App ID / App Secret。
+```
 
-| 平台 | 一键部署 | 说明 |
-|------|---------|------|
-| [Vercel](https://vercel.com/new) | [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new) | 最简单，免费额度够个人用 |
-| [Railway](https://railway.app/new) | [Deploy on Railway](https://railway.app/new) | 长连接好用 |
-| Cloudflare Workers | `wrangler deploy` | 冷启动近零、全球边缘 |
+Agent 会按 skill 执行：安装依赖、运行 `npm run setup`、解析 wiki/base 链接、自动生成 `.env`，并只在启用飞书私聊机器人时提醒你配置公网 HTTPS webhook。
 
-> 一键部署按钮需要你 fork 本仓库后，在按钮链接里把 git URL 改成你的仓库地址才能生效。
+### 还不能和机器人对话？
 
-### 8. 回飞书后台配 webhook
-
-1. 飞书后台 → "**事件与回调** → 事件配置**"
-2. **请求地址**填 `https://你的域名/webhook/lark`
-3. （建议）在"**加密策略**"启用 Encrypt Key，把生成的 Key 也回填进 `.env` 的 `FEISHU_ENCRYPT_KEY`
-4. **Verification Token** 也复制到 `.env` 的 `FEISHU_VERIFICATION_TOKEN`
-5. 在"**添加事件**" → 搜索并添加 `im.message.receive_v1`
-6. 飞书会自动发一个 URL 验证，看到 ✅ 就成功了
-7. 重启服务（`Ctrl+C` 后 `npm run dev`）让新环境变量生效
-
-### 9. 发布应用 + 加机器人为好友
-
-1. 飞书后台 → "**版本管理与发布**" → 创建版本 → 可见范围选"仅自己"（或你的团队） → 提交申请
-2. 个人企业一般自己当管理员，立刻审批通过
-3. 在飞书 APP 里搜索你的机器人名 → 添加 → 私聊发 `/帮助`
-
-🎉 看到机器人回复就是全通了。
+- **搜不到机器人**：检查"应用功能 → 机器人"是否已启用，以及"版本管理与发布"是否已经发布到包含你的可见范围。
+- **能发消息但没回复**：检查服务是否正在运行、飞书事件回调 URL 是否是公网 HTTPS、是否添加了 `im.message.receive_v1` 事件，以及 `.env` 里的 `FEISHU_VERIFICATION_TOKEN` / `FEISHU_ENCRYPT_KEY` 是否和后台一致。
+- **机器人回复写表失败**：检查模板副本里是否已经"添加文档应用"，以及应用权限里是否开了 `bitable:app`。如果 `BASE_TOKEN` 填的是 wiki 链接，还需要 `wiki:node:read`。
 
 ## 📦 项目结构
 
 ```
 src/
 ├── server.ts             # Hono 入口
+├── setup.ts              # 交互式初始化 .env
 ├── config.ts             # 环境变量加载 + 必填校验
 ├── types.ts              # 类型 + 字段枚举（要改字段从这里改）
 ├── lark/
