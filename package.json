@@ -1,0 +1,40 @@
+{
+  "name": "lark-application-bot",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "一个轻量的飞书机器人服务，通过对话管理求职投递多维表格记录",
+  "keywords": [
+    "feishu",
+    "lark",
+    "bot",
+    "bitable",
+    "job-application",
+    "hono",
+    "typescript"
+  ],
+  "author": "Rui",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "dotenv": "^16.4.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
