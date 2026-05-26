@@ -23,6 +23,8 @@
     "dev": "tsx watch src/ws.ts",
     "build": "tsc",
     "start": "node dist/ws.js",
+    "launchd:install": "bash scripts/install-launchd.sh",
+    "launchd:uninstall": "bash scripts/uninstall-launchd.sh",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -48,6 +48,18 @@ export interface MessageReceiveEvent {
   };
 }
 
+export interface BotMenuEvent {
+  operator: {
+    operator_id: {
+      user_id?: string;
+      open_id: string;
+      union_id?: string;
+    };
+    operator_name?: string;
+  };
+  event_key: string;
+}
+
 // ===== 多维表格 =====
 
 export interface BitableRecord {

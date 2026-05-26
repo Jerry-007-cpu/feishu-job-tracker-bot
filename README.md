@@ -1,6 +1,6 @@
-# Lark Application Bot · 飞书投递记录机器人
+# Feishu Job Tracker Bot · 飞书投递记录机器人
 
-> 用聊天指令管理求职投递记录的飞书机器人。在飞书里直接对机器人发 `/创建 携程 产品经理 当前进度三面`，自动写进你的多维表格。
+> 用飞书机器人菜单 + 投递鸭小程序同步求职投递记录。小程序里结构化录入，复制投递信息发给机器人，自动写进你的飞书多维表格。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
@@ -16,26 +16,30 @@
 
 ## ✨ 特性
 
-- 🤖 **指令式交互**：`/创建` `/更新` `/查询` `/帮助` 四个命令搞定所有操作
-- ✅ **写前必确认**：所有写入操作先回复确认信息，避免误写
-- 🔐 **签名校验 + 加密事件**：内置 `X-Lark-Signature` 校验和 AES 解密
-- 🪶 **轻量、零运维**：单进程 Node 服务，可一键部署到 Vercel / Cloudflare Workers
-- 🧪 **带单测**：parser 核心逻辑有 16 个 vitest 单测护航
+- 🔘 **菜单驱动**：顶部菜单一键查看本周待办、投递总览、帮助说明
+- 📲 **小程序同步**：识别投递鸭小程序复制出的结构化投递信息，直接写入多维表格
+- ⚡ **本地规则解析**：全程本地 KV 解析，不走 LLM，不消耗 token
+- 🗓️ **每日提醒**：支持每天定时推送今日 / 本周待办
+- 🧠 **内存缓存**：多维表格主表缓存 + 外部变更事件刷新，菜单查询更快
+- 🧪 **带单测**：parser 和缓存逻辑有 vitest 单测护航
 
 ## 📋 适用人群
 
 任何想用飞书机器人 + 多维表格管理结构化记录的人。本项目以"求职投递"为例，但只要改下 `src/types.ts` 里的字段和枚举，就能改造成读书记录、健身打卡、客户跟进、Bug 跟进等任何场景。
 
-## 🎬 命令示例
+## 🎬 同步示例
 
 ```
-/创建 携程 产品经理 当前进度三面 日期2026-05-25 平台官网 base上海 备注约了面试
-/更新 携程 产品经理 当前进度hr面
-/查询 携程
-/帮助
+公司：携程
+岗位名称：产品经理
+当前进度：三面
+平台：官网
+base：上海
+对应日期：2026-05-25
+备注：约了面试
 ```
 
-参数顺序无关、可缺省，紧贴写法（`当前进度三面`）和带空格写法（`当前进度 三面`）都识别。
+字段顺序无关，支持全角 / 半角冒号。`公司` 和 `岗位名称` 必填，其他字段可为空。
 
 ## 🚀 快速开始
 
@@ -78,13 +82,53 @@ npm run setup
 ### 4. 本地启动
 
 ```bash
-npm test           # 应看到 16/16 通过
+npm test           # 应看到全部测试通过
 npm run dev        # 启动飞书长连接
 ```
 
-看到 `Feishu bot long connection starting...` 后，回飞书私聊机器人发送 `/帮助`。
+看到 `Feishu bot long connection starting...` 后，在飞书里点击机器人菜单，或发送一段小程序复制出的投递信息。能收到回复，就是全通了。
 
-看到机器人回复，就是全通了。
+### 5. 配置机器人菜单预设
+
+在飞书开放平台 **应用功能 → 机器人 → 菜单配置** 中，菜单项的"响应动作"选择 **推送事件**，并填写下面的自定义事件 ID：
+
+| 菜单名称 | 自定义事件 ID | 用途 |
+| --- | --- | --- |
+| 待办 | `preset_agenda` | 查看今天 + 本周安排（本自然周周一到周日） |
+| 投递总览 | `preset_overview` | 汇总全部投递、面试中、待跟进和行动建议 |
+| 帮助 | `preset_help` | 查看菜单说明 |
+
+历史兼容：`preset_today`、`preset_week` 会返回同一个"待办"视图；`preset_followup` 会返回"投递总览"。
+
+还需要在 **事件与回调 → 事件配置** 中添加事件：
+
+- `im.message.receive_v1`：接收用户消息
+- `application.bot.menu_v6`：接收机器人自定义菜单点击
+- `drive.file.bitable_record_changed_v1`：外部修改多维表格后刷新缓存（推荐）
+
+菜单配置和事件配置修改后，需要创建应用版本并发布，通常几分钟内生效。
+
+### 6. macOS 开机自启
+
+本项目使用 macOS `launchd` 注册为当前用户的登录自启服务。安装后无需再开终端保持 `npm run dev` 运行，电脑登录后会自动启动机器人，异常退出也会自动拉起。
+
+```bash
+npm run launchd:install
+```
+
+常用检查命令：
+
+```bash
+launchctl print gui/$(id -u)/com.jerry.larkbot
+tail -f logs/larkbot.log
+tail -f logs/larkbot.error.log
+```
+
+如果以后不想自启：
+
+```bash
+npm run launchd:uninstall
+```
 
 ### AI Agent 快速开始
 
@@ -105,7 +149,9 @@ Agent 会按 skill 执行：安装依赖、运行 `npm run setup`、解析 wiki/
 ### 还不能和机器人对话？
 
 - **搜不到机器人**：检查"应用功能 → 机器人"是否已启用，以及"版本管理与发布"是否已经发布到包含你的可见范围。
-- **能发消息但没回复**：检查 `npm run dev` 是否还在运行、事件订阅是否选择"使用长连接接收事件"、是否添加了 `im.message.receive_v1` 事件。
+- **普通聊天没回复**：这是当前设计。机器人只响应菜单事件和小程序结构化粘贴文本。
+- **菜单没回复**：检查 `npm run dev` 是否还在运行、事件订阅是否选择"使用长连接接收事件"、是否添加了 `application.bot.menu_v6` 事件。
+- **粘贴投递信息没回复**：检查消息里是否同时包含 `公司：` 和 `岗位名称：`。
 - **机器人回复写表失败**：检查模板副本里是否已经"添加文档应用"，以及应用权限里是否开了 `bitable:app`。如果 `BASE_TOKEN` 填的是 wiki 链接，还需要 `wiki:node:read`。
 
 ## 📦 项目结构
@@ -119,18 +165,24 @@ src/
 ├── types.ts              # 类型 + 字段枚举（要改字段从这里改）
 ├── lark/
 │   ├── client.ts         # 飞书 Open API client（tenant_access_token 缓存）
-│   ├── base.ts           # 多维表格 CRUD
+│   ├── base.ts           # 多维表格 CRUD + 主表缓存入口
 │   ├── im.ts             # 消息发送
+│   ├── recordCache.ts    # 主表记录内存缓存
 │   └── verify.ts         # 事件签名校验 + AES 解密
 ├── bot/
 │   ├── router.ts         # 旧 webhook 路由（通常不用）
 │   ├── commands.ts       # 命令分发 + 确认流程
+│   ├── menu.ts           # 菜单预设回复
 │   ├── parser.ts         # 命令文本解析
+│   ├── paste_parser.ts   # 小程序粘贴文本解析
+│   ├── push_target.ts    # 每日推送目标记录
+│   ├── scheduler.ts      # 每日待办推送
 │   └── session.ts        # 待确认状态管理（TTL 10min）
 └── utils/
     └── dedupe.ts         # event_id FIFO 去重
 tests/
-└── parser.test.ts        # 解析器单测
+├── parser.test.ts        # 解析器单测
+└── recordCache.test.ts   # 缓存单测
 ```
 
 ## 🛠 自定义你自己的场景
@@ -138,9 +190,9 @@ tests/
 想改成别的用途（读书记录、客户跟进等）？只需要改这几处：
 
 1. **`src/types.ts`** — 改 `FieldKey`、`FIELD_NAME_MAP`，加你的字段
-2. **`src/bot/parser.ts`** 的 `buildBitableFields` — 加新字段的映射
-3. **`src/bot/commands.ts`** 的 `handleHelp` — 改 /帮助 的文案
-4. **`src/bot/parser.ts`** 的 `detectCommand` 正则 — 如果你想换命令名（比如 `/add` 替代 `/创建`）
+2. **`src/bot/paste_parser.ts`** — 加小程序粘贴字段别名
+3. **`src/bot/parser.ts`** 的 `buildBitableFields` — 加新字段的写表映射
+4. **`src/bot/menu.ts`** — 改菜单预设和帮助文案
 5. **`README.md`** —— 改模板和安装说明
 
 `src/lark/*`（飞书 API 封装）和 `src/utils/dedupe.ts` 大概率不用改。
@@ -159,8 +211,8 @@ tests/
 - 当前 dedupe 是**单实例内存**，迁 serverless 多实例需换 Redis/KV
 - `/查询` 和 `/更新` 用全表扫描 + 内存过滤，记录量 > 1000 后建议改 Bitable `search` API
 - **不支持删除**（这是有意的，需要删请直接到多维表格操作）
-- 日期目前只支持 `YYYY-MM-DD`，"今天/明天/下周一" 在路线图
-- 未做 LLM 自然语言兜底解析
+- 小程序粘贴日期目前只建议使用 `YYYY-MM-DD`
+- 不解析自由聊天文本，避免误触写表
 
 ## 🤝 贡献
 

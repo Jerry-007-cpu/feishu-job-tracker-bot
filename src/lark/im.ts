@@ -14,7 +14,7 @@ export class IMService {
 
   /** 向用户发送私信 */
   async sendMessage(openId: string, content: string): Promise<void> {
-    await larkClient.post('/open-apis/im/v1/messages', {
+    await larkClient.post('/open-apis/im/v1/messages?receive_id_type=open_id', {
       receive_id: openId,
       msg_type: 'text',
       content: JSON.stringify({ text: content }),

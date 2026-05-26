@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import { BaseService } from '../lark/base.js';
+import { baseService } from '../lark/base.js';
 import { imService } from '../lark/im.js';
 import { sessionStore } from './session.js';
 import {
@@ -11,9 +11,8 @@ import {
   formatFieldChanges,
   isConfirmResponse,
   isSelectResponse,
+  parseSelectIndex,
 } from './parser.js';
-
-const baseService = new BaseService(config.base.token);
 
 /** /帮助 */
 async function handleHelp(openId: string, messageId: string): Promise<void> {
@@ -230,7 +229,8 @@ async function handleSelect(openId: string, messageId: string, text: string): Pr
   }
 
   if (session.kind === 'select_for_update') {
-    const idx = parseInt(text.trim(), 10) - 1;
+    const selectedIndex = parseSelectIndex(text);
+    const idx = selectedIndex === null ? -1 : selectedIndex - 1;
     if (idx < 0 || idx >= session.records.length) {
       await imService.replyMessage(messageId, `请输入 1-${session.records.length} 之间的序号`);
       return;
@@ -252,7 +252,8 @@ async function handleSelect(openId: string, messageId: string, text: string): Pr
   }
 
   if (session.kind === 'select_for_query') {
-    const idx = parseInt(text.trim(), 10) - 1;
+    const selectedIndex = parseSelectIndex(text);
+    const idx = selectedIndex === null ? -1 : selectedIndex - 1;
     if (idx < 0 || idx >= session.records.length) {
       await imService.replyMessage(messageId, `请输入 1-${session.records.length} 之间的序号`);
       return;

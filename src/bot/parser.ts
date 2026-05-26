@@ -91,8 +91,39 @@ export function parseQueryCommand(text: string): ParsedQueryCommand {
 }
 
 /**
+ * 将 YYYY-MM-DD / YYYY-M-D / YYYY/MM/DD / 等日期字符串转成 Unix 毫秒时间戳
+ * Bitable 的日期字段要求 number 类型
+ * 解析失败返回 null
+ */
+export function parseDateToMs(input: string): number | null {
+  const s = input.trim();
+  if (!s) return null;
+
+  // 已经是数字（容错，例如模型抽抽风返回 timestamp 字符串）
+  if (/^\d{10,13}$/.test(s)) {
+    const n = parseInt(s, 10);
+    return n < 1e12 ? n * 1000 : n; // 10 位秒级补成毫秒
+  }
+
+  // 匹配 YYYY[-/.]M[M][-/.]D[D]
+  const m = s.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  const day = parseInt(m[3], 10);
+
+  if (year < 1970 || year > 2100) return null;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+
+  // 使用 UTC 中午 12 点构造，避开时区导致前后差一天
+  const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return d.getTime();
+}
+
+/**
  * 将解析出的字段转换成 Bitable 写入格式
- * 日期字段需要特殊处理
+ * 日期字段需要把 YYYY-MM-DD 字符串转成毫秒时间戳
  */
 export function buildBitableFields(
   fields: Partial<Record<FieldKey, string>>,
@@ -106,8 +137,11 @@ export function buildBitableFields(
   if (fields['base']) result['base'] = fields['base'];
   if (fields['备注']) result['备注'] = fields['备注'];
   if (fields['对应日期']) {
-    // 格式 YYYY-MM-DD
-    result['对应日期'] = fields['对应日期'];
+    const ms = parseDateToMs(fields['对应日期']);
+    if (ms !== null) {
+      result['对应日期'] = ms; // Bitable 要求 number（毫秒时间戳）
+    }
+    // 解析失败就直接跳过，避免触发 DatetimeFieldConvFail
   }
 
   return result;
@@ -122,19 +156,122 @@ export function formatRecordSummary(
   return `${company} - ${position}${progress ? `（${progress}）` : ''}`;
 }
 
-/** 生成字段变更文本 */
+/** 生成字段变更文本
+ *
+ * 走 formatFieldValue 统一格式化：
+ * - 对应日期（ms 时间戳）→ YYYY-MM-DD
+ * - 数组 / 对象 → 取 text/name/value
+ * - 其他 → 原样
+ */
 export function formatFieldChanges(fields: Record<string, unknown>): string {
   return Object.entries(fields)
-    .map(([k, v]) => `${k}: ${v}`)
+    .map(([k, v]) => `${k}: ${formatFieldValue(v)}`)
     .join('\n');
 }
 
 /** 检查文本是否为确认回复 */
 export function isConfirmResponse(text: string): boolean {
-  return /^(确认|是的|对|嗯|是|y|yes)$/i.test(text.trim());
+  return /^(确认|是的|对|嗯|是|ok|y|yes)$/i.test(text.trim());
 }
 
-/** 检查文本是否为数字选择回复 */
+/** 检查文本是否为取消回复 */
+export function isCancelResponse(text: string): boolean {
+  return /^(取消|不要了?|算了|不|no|cancel)$/i.test(text.trim());
+}
+
+/**
+ * 检查文本是否为序号选择回复
+ * 支持：1 / 2 / 第一个 / 第二 / 第三个 / 一 / 二 / 首个 / 第1 / 第1个
+ */
 export function isSelectResponse(text: string): boolean {
-  return /^\d+$/.test(text.trim());
+  return parseSelectIndex(text) !== null;
+}
+
+/**
+ * 把序号回复解析成 1-based 整数（找不到返回 null）
+ * 例：
+ *   "1"        → 1
+ *   "第一"      → 1
+ *   "第一个"    → 1
+ *   "第二"      → 2
+ *   "首个"      → 1
+ *   "一"        → 1
+ *   "第10个"    → 10
+ *   "其他"       → null
+ */
+export function parseSelectIndex(text: string): number | null {
+  const t = text.trim();
+
+  // 纯阿拉伯数字
+  if (/^\d+$/.test(t)) {
+    const n = parseInt(t, 10);
+    return n > 0 ? n : null;
+  }
+
+  // 「第N」「第N个」（N 可以是阿拉伯数字）
+  const arabic = t.match(/^第\s*(\d+)\s*(个|条|项)?$/);
+  if (arabic) {
+    const n = parseInt(arabic[1], 10);
+    return n > 0 ? n : null;
+  }
+
+  // 首个 / 最后一个
+  if (/^首(个|条|项)?$/.test(t)) return 1;
+
+  // 中文数字（一~十），可带"第"和"个/条/项"
+  const cnNumMap: Record<string, number> = {
+    一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5,
+    六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
+  };
+  const cn = t.match(/^第?\s*([一二两三四五六七八九十])\s*(个|条|项)?$/);
+  if (cn && cnNumMap[cn[1]]) {
+    return cnNumMap[cn[1]];
+  }
+
+  return null;
+}
+
+/**
+ * 把 Bitable 返回的字段值（日期可能是 ms 时间戳）格式化成可显示字符串
+ * - 日期字段：number（ms）→ YYYY-MM-DD
+ * - 数组：取第一个元素的 text/name/value
+ * - 其他：String()
+ */
+export function formatFieldValue(value: unknown): string {
+  if (value == null || value === '') return '';
+
+  if (typeof value === 'number') {
+    // 启发式：> 10^11 当成毫秒时间戳（约 1973 年以后）
+    if (value > 1e11) {
+      const d = new Date(value);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+    }
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const obj = item as Record<string, unknown>;
+          return String(obj.text ?? obj.name ?? obj.value ?? '');
+        }
+        return String(item);
+      })
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    return String(obj.text ?? obj.name ?? obj.value ?? JSON.stringify(obj));
+  }
+
+  return String(value);
 }

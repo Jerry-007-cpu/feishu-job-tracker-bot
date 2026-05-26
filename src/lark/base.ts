@@ -1,4 +1,6 @@
 import { larkClient } from './client.js';
+import { RecordCache, type RecordCacheOptions } from './recordCache.js';
+import { config } from '../config.js';
 import type { BitableRecord } from '../types.js';
 
 interface BitableTable {
@@ -38,14 +40,47 @@ function looksLikeWikiToken(input: string): boolean {
 
 /**
  * 多维表格操作封装
+ *
+ * 主表数据带内存缓存（RecordCache），所有"全表"读取路径走缓存：
+ *   - listAllRecords：缓存命中即返回
+ *   - 写操作（create/update）成功后 upsert 缓存里那条
+ *   - 外部事件（飞书 bitable_record_changed）通过 scheduleMainTableRefresh 触发防抖刷新
+ *
+ * 启动时调用 prewarmMainTable() 预热（参见 ws.ts）。
  */
 export class BaseService {
   private resolvedBaseToken: Promise<string> | null = null;
   private resolvedMainTableId: Promise<string> | null = null;
+  private mainTableCache: RecordCache;
 
   constructor(
     private baseTokenInput: string,
-  ) {}
+    cacheOptions: RecordCacheOptions = {},
+  ) {
+    // 缓存的 loader 必须用 fetchAllRecordsFresh，绕开缓存自身，避免递归
+    this.mainTableCache = new RecordCache(
+      () => this.fetchAllRecordsFresh(''),
+      cacheOptions,
+    );
+  }
+
+  /** 启动时调用：预热主表缓存 + 启动定时刷新兜底 */
+  async prewarmMainTable(): Promise<void> {
+    await this.mainTableCache.prewarm();
+  }
+
+  /**
+   * 外部事件触发缓存刷新（防抖）。
+   * 在 ws.ts 的 bitable_record_changed 事件 handler 里调用。
+   */
+  scheduleMainTableRefresh(): void {
+    this.mainTableCache.scheduleRefresh();
+  }
+
+  /** 诊断用：当前缓存大小 */
+  getMainTableCacheSize(): number {
+    return this.mainTableCache.size();
+  }
 
   private async getBaseToken(): Promise<string> {
     if (!this.resolvedBaseToken) {
@@ -136,7 +171,7 @@ export class BaseService {
     return mainTable.id;
   }
 
-  /** 创建单条记录 */
+  /** 创建单条记录。成功后同步写入缓存。 */
   async createRecord(tableId: string, fields: Record<string, unknown>): Promise<BitableRecord> {
     const baseToken = await this.getBaseToken();
     const resolvedTableId = await this.resolveTableId(tableId);
@@ -144,10 +179,13 @@ export class BaseService {
       `/open-apis/bitable/v1/apps/${baseToken}/tables/${resolvedTableId}/records`,
       { fields },
     );
-    return (res.data as { record: BitableRecord }).record;
+    const record = (res.data as { record: BitableRecord }).record;
+    // 写后失效：用飞书返回的 record 直接 upsert，不需要重拉全表
+    this.mainTableCache.upsert(record);
+    return record;
   }
 
-  /** 更新单条记录（全量覆盖 fields） */
+  /** 更新单条记录（全量覆盖 fields）。成功后同步写入缓存。 */
   async updateRecord(
     tableId: string,
     recordId: string,
@@ -159,11 +197,28 @@ export class BaseService {
       `/open-apis/bitable/v1/apps/${baseToken}/tables/${resolvedTableId}/records/${recordId}`,
       { fields },
     );
-    return (res.data as { record: BitableRecord }).record;
+    const record = (res.data as { record: BitableRecord }).record;
+    this.mainTableCache.upsert(record);
+    return record;
   }
 
-  /** 列出所有记录（自动翻页） */
-  async listAllRecords(tableId: string): Promise<BitableRecord[]> {
+  /**
+   * 列出所有记录。
+   *
+   * 默认走主表缓存（命中即返回）。如果将来需要读非主表的全表数据，
+   * 调用 fetchAllRecordsFresh(tableId) 走原始 HTTP 路径。
+   *
+   * 注意：tableId 参数当前是为了向后兼容保留；所有调用方都在读主表。
+   */
+  async listAllRecords(_tableId: string): Promise<BitableRecord[]> {
+    return this.mainTableCache.getAll();
+  }
+
+  /**
+   * 强制从飞书拉全表（绕开缓存）。
+   * 提供给 RecordCache 的 loader 使用，外部一般不需要直接调。
+   */
+  async fetchAllRecordsFresh(tableId: string): Promise<BitableRecord[]> {
     const baseToken = await this.getBaseToken();
     const resolvedTableId = await this.resolveTableId(tableId);
     const records: BitableRecord[] = [];
@@ -203,3 +258,8 @@ export class BaseService {
     });
   }
 }
+
+/**
+ * 全局单例：commands.ts 和 ws.ts 都从这里取，保证缓存只有一份。
+ */
+export const baseService = new BaseService(config.base.token);

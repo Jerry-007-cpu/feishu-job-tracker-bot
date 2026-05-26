@@ -15,6 +15,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# 本地运行态
+data/
+vitest.config.ts.timestamp-*.mjs
+
 # 编辑器
 .vscode/
 .idea/

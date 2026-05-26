@@ -3,10 +3,12 @@ import { config } from '../config.js';
 import { verifySignature, decryptEvent } from '../lark/verify.js';
 import { eventDedupe } from '../utils/dedupe.js';
 import { dispatchCommand } from './commands.js';
+import { handleBotMenuEvent } from './menu.js';
 import type {
   WebhookBody,
   LarkEventV2,
   MessageReceiveEvent,
+  BotMenuEvent,
   EncryptedPayload,
   UrlVerificationPayload,
 } from '../types.js';
@@ -117,6 +119,18 @@ export async function handleWebhook(c: Context): Promise<Response> {
       handleMessageEvent(event as unknown as MessageReceiveEvent).catch((err) => {
         console.error('[webhook] handleMessageEvent failed:', err);
       });
+      return c.json({});
+    }
+
+    case 'application.bot.menu_v6': {
+      const menuEvent = event as unknown as BotMenuEvent;
+      const openId = menuEvent.operator?.operator_id?.open_id;
+      const eventKey = menuEvent.event_key;
+      if (openId && eventKey) {
+        handleBotMenuEvent(openId, eventKey).catch((err) => {
+          console.error('[webhook] handleBotMenuEvent failed:', err);
+        });
+      }
       return c.json({});
     }
 
